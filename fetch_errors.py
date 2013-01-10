@@ -9,7 +9,7 @@ from pyquery import PyQuery as pq
 
 
 def fetch_error_pages(account, project_id, auth_token):
-    page = 0
+    page = 1
     base_url = "http://%s.airbrake.io/" % (account,)
     while True:
         print("Fetching page %d" % page)
@@ -53,9 +53,9 @@ if __name__ == "__main__":
     try:
         with open("config.json") as f:
             config = json.load(f)
-            auth_token = config[u'auth_token']
-            account = config[u'account']
-            project = config[u'project_id']
+            auth_token = config['auth_token']
+            account = config['account']
+            project = config['project_id']
 
             for page in fetch_error_pages(account, project, auth_token):
                 for group in page:

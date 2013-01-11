@@ -6,7 +6,209 @@
     <title>Wunderlist iOS Crash Explorer</title>
     
     <script src="jquery-1.7.2.js" type="text/javascript"></script>
-    
+    <script type="text/javascript" charset="utf-8">
+
+        // Keeps all the data which is loaded via JSONP
+        var loaded_data = [];
+        // This is the callback that all embedded JSONP files call.
+        function load_data (array) {
+            loaded_data = array;
+        };
+        
+        function selectRow(row) {
+            row.parent().find('tr').removeClass('selected');
+            if (row.hasClass("last")) {
+                row.prev().addClass('selected');
+            }
+            else {
+                row.next().addClass('selected');
+            }
+            row.addClass('selected');
+        };
+        
+        function orderByFrequency(countingDict) {
+            var countedMessages = [];
+
+            for(var key in countingDict) {
+                if(countingDict.hasOwnProperty(key)) {
+                    countedMessages.push({"key": key, "count": countingDict[key]});
+                }
+            }
+            countedMessages.sort(function(a, b) {
+                return b["count"] - a["count"];
+            });
+            
+            return countedMessages;
+        }
+
+        function showDetailsForCrash(crashDict) {
+            var details = $('div#details');
+            details.empty();
+            
+            details.append('<h2>' + crashDict["title"] + '</h2>');
+            
+            var messageCounter = {};
+            var platformCounter = {};
+            var osCounter = {};
+            var backtraceCounter = {};
+
+            var errors = crashDict["errors"];
+            for (var i=0; i < errors.length; i++) {
+                var multiplier = parseInt(errors[i]["notices-count"], 10);
+                if (multiplier < 0) {
+                    multiplier = 1;
+                }
+
+                var message = errors[i]["error-message"];
+                var platform = errors[i]["environment"]["platform"];
+                var os = errors[i]["environment"]["operating-system"];
+
+                if (! messageCounter.hasOwnProperty(message)) {
+                    messageCounter[message] = multiplier;
+                }
+                else {
+                    messageCounter[message] += multiplier;
+                }
+                
+                if (! platformCounter.hasOwnProperty(platform)) {
+                    platformCounter[platform] = multiplier;
+                }
+                else {
+                    platformCounter[platform] += multiplier;
+                }
+                
+                if (! osCounter.hasOwnProperty(os)) {
+                    osCounter[os] = multiplier;
+                }
+                else {
+                    osCounter[os] += multiplier;
+                }
+
+                var traceRegex = /^\s*([^:]+):.+\+ (\d+)'?\s*$/g;
+                var backtrace = errors[i]["backtrace"];
+                var packedTrace = "";
+
+                for (var j=0; j < backtrace.length; j++) {
+                    var line = backtrace[j];
+                    var match = traceRegex.exec(line);
+                    
+                    if (match != null) {
+                        packedTrace += match[1] + ":" + match[2] + ",";
+                    }
+                };
+
+                if (! backtraceCounter.hasOwnProperty(packedTrace)) {
+                    backtraceCounter[packedTrace] = {"count": multiplier, "trace": backtrace};
+                }
+                else {
+                    backtraceCounter[packedTrace]["count"] += multiplier;
+                }
+            };
+
+            var countedMessages = orderByFrequency(messageCounter);
+            for (var i=0; i < countedMessages.length; i++) {
+                details.append('<p><span class=count>' + countedMessages[i]["count"] + 'x</span> ' +
+                                    countedMessages[i]["key"] + '</p>');
+            };
+            
+            details.append('<h3>Environment</h3>');
+            
+            details.append('<p><strong>Platform:</strong> ');
+            var countedPlatforms = orderByFrequency(platformCounter);
+            for (var i=0; i < countedPlatforms.length; i++) {
+                details.append('<span class=count>' + countedPlatforms[i]["count"] + 'x</span> ' +
+                               countedPlatforms[i]["key"] + ', ');
+            };
+            details.append('</p>');
+            
+            details.append('<p><strong>Operating System:</strong> ');
+            var countedOSs = orderByFrequency(osCounter);
+            for (var i=0; i < countedOSs.length; i++) {
+                details.append('<span class=count>' + countedOSs[i]["count"] + 'x</span> ' +
+                               countedOSs[i]["key"] + ', ');
+            };
+            details.append('</p>');
+            
+            details.append('<h3>Backtraces</h3>');
+            
+            var backtracesElement = $('<div id=backtraces></div>');
+            details.append(backtracesElement);
+            
+            var countedBacktraces = [];
+            for (var key in backtraceCounter) {
+                if(backtraceCounter.hasOwnProperty(key)) {
+                    countedBacktraces.push({"key": key,
+                                            "count": backtraceCounter[key]["count"],
+                                            "trace": backtraceCounter[key]["trace"]});
+                }
+            }
+            countedBacktraces.sort(function(a, b) {
+                return b["count"] - a["count"];
+            });
+            
+            for (var i=0; i < countedBacktraces.length; i++) {
+                
+                var traceObj = countedBacktraces[i];
+                
+                var listTrace = "";
+                var trace = traceObj["trace"];
+                for (var j=0; j < trace.length; j++) {
+                    if (trace[j].indexOf("Wunderlist") == 0) {
+                        listTrace += "<li class=ours>" + trace[j] + "</li>\n";
+                    }
+                    else {
+                        listTrace += "<li>" + trace[j] + "</li>\n";
+                    }
+                };
+                
+                backtracesElement.append('<div class=backtrace>' +
+                                             '<strong>' + traceObj["count"] + 'x</strong>' +
+                                             '<ul>' + listTrace + '</ul>'+
+                                         '</div>');
+            };
+
+            details.append('</div>');
+        };
+        
+        $(document).ready(function() {
+            var table = $("table#crash-list");
+            
+            for (var i=0; i < loaded_data.length; i++) {
+                var obj = loaded_data[i];
+                console.log("adding " + obj["title"]);
+
+                var row1 = $('<tr>' +
+                                 '<td class=no>' + (i + 1) + '</td>' +
+                                 '<td class=count>' + obj["count"] + '</td>' +
+                                 '<td class=title>' + obj["title"] +'</td>' +
+                             '</tr>');
+                var row2 = $('<tr class=last><td class=message colspan=3>' + obj["message"] + '</td></tr>');
+
+                row1.attr("data-index", i);
+                row2.attr("data-index", i);
+
+                table.append(row1);
+                table.append(row2);
+            };
+
+            $("table#crash-list tr").click(function(event) {
+                var thisTr = $(event.delegateTarget);
+                
+                var i = thisTr.attr("data-index");
+                var obj = loaded_data[i];
+                
+                console.log("Loading " + i + " " + obj["title"]);
+                
+                selectRow(thisTr);
+                showDetailsForCrash(obj);
+            });
+        });
+    </script>
+
+    <!-- Chrome does not allow any kind of dynamic loading out of JavaScript of resources
+         from file:// URLs, so we pre-load all the data via JSONP. -->
+    <script src="clusters.jsonp" type="text/javascript"></script>
+
     <style type="text/css" media="screen">
         /* http://meyerweb.com/eric/tools/css/reset/ | v2.0 | 20110126 */
         html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre,
@@ -55,7 +257,7 @@
             white-space: nowrap;
             overflow: hidden;
         	text-overflow: ellipsis;
-        	max-width: 350px;
+        	max-width: 330px;
         }
         tr.last td {
             border-bottom: 1px solid #888;
@@ -67,7 +269,10 @@
         tr.selected td.no, tr.selected td.count, tr.selected td.message {
             color: #777;
         }
-        
+        tr td {
+            cursor: hand;
+            cursor: pointer;
+        }
         td.title {
             font-weight: bold;
         }
@@ -94,11 +299,11 @@
         }
         
         span.count {
-            color: #888;
+            color: dodgerblue;
         }
         
         p {
-            padding: 0 10px;
+            padding: 4px 10px;
         }
         
         div#backtraces {
@@ -112,7 +317,7 @@
             float: left;*/
         }
         div.backtrace li {
-            color: #888;
+            color: #999;
             padding-bottom: 6px;
         }
         div.backtrace li.ours {
@@ -123,135 +328,16 @@
 </head>
 
 <body>
-
     <div id="details">
-        <h2>NSInvalidArgumentException</h2>
-        <p><span class=count>5x</span> Unacceptable type of value for attribute: property = "userName"; desired type = NSString; given type = NSNull; value = &lt;null>.'</p>
-        <p><span class=count>2x</span> Unacceptable type of value for attribute: property = "userName"; desired type = NSString; given type = NSNull; value = &lt;null>.'</p>
-
-        <h3>Environment</h3>
-        <p><strong>Platform:</strong> <span class=count>5x</span> iPhone 4 (GSM), <span class=count>2x</span> iPad Mini</p>
-        <p><strong>Operating System:</strong> <span class=count>5x</span> Version 5.1.1 (Build 9B206), <span class=count>2x</span> Version 4.3 (Build ASDGD)</p>
-
-        <h3>Backtraces</h3>
-        
-        <div id=backtraces>
-            <div class=backtrace>
-                <strong>50x</strong>
-                <ul>
-                    <li>CoreFoundation:0:in `0x320d22bb &lt;redacted> + 186'</li>
-                    <li>libobjc.A.dylib:1:in `0x32f9097f objc_exception_throw + 30'</li>
-                    <li>CoreFoundation:2:in `0x320d1f99 &lt;redacted> + 0'</li>
-                    <li class=ours>Wunderlist:3:in `0x000ffb51 Wunderlist + 912209'</li>
-                    <li class=ours>Wunderlist:4:in `0x000fec2b Wunderlist + 908331'</li>
-                    <li class=ours>Wunderlist:5:in `0x000facd5 Wunderlist + 892117'</li>
-                    <li class=ours>Wunderlist:6:in `0x000fde11 Wunderlist + 904721'</li>
-                    <li>libdispatch.dylib:7:in `0x346c211f &lt;redacted> + 10'</li>
-                    <li>libdispatch.dylib:8:in `0x346c14b7 &lt;redacted> + 22'</li>
-                    <li>libdispatch.dylib:9:in `0x346c2dcb &lt;redacted> + 226'</li>
-                    <li>CoreFoundation:10:in `0x320a5f3b &lt;redacted> + 1290'</li>
-                    <li>CoreFoundation:11:in `0x32018ebd CFRunLoopRunSpecific + 356'</li>
-                    <li>CoreFoundation:12:in `0x32018d49 CFRunLoopRunInMode + 104'</li>
-                    <li>GraphicsServices:13:in `0x39e162eb GSEventRunModal + 74'</li>
-                    <li>UIKit:14:in `0x398d42f9 UIApplicationMain + 1120'</li>
-                    <li class=ours>Wunderlist:15:in `0x0003c151 Wunderlist + 110929'</li>
-                    <li class=ours>Wunderlist:16:in `0x00023100 Wunderlist + 8448'</li>
-                </ul>
-            </div>
-            
-            <div class=backtrace>
-                <strong>17x</strong>
-                <ul>
-                    <li>CoreFoundation:0:in `0x320d22bb &lt;redacted> + 186'</li>
-                    <li>libobjc.A.dylib:1:in `0x32f9097f objc_exception_throw + 30'</li>
-                    <li>CoreFoundation:2:in `0x320d1f99 &lt;redacted> + 0'</li>
-                    <li class=ours>Wunderlist:3:in `0x000ffb51 Wunderlist + 912209'</li>
-                    <li class=ours>Wunderlist:6:in `0x000fde11 Wunderlist + 904721'</li>
-                    <li>libdispatch.dylib:7:in `0x346c211f &lt;redacted> + 10'</li>
-                    <li>libdispatch.dylib:8:in `0x346c14b7 &lt;redacted> + 22'</li>
-                    <li>libdispatch.dylib:9:in `0x346c2dcb &lt;redacted> + 226'</li>
-                    <li>GraphicsServices:13:in `0x39e162eb GSEventRunModal + 74'</li>
-                    <li>UIKit:14:in `0x398d42f9 UIApplicationMain + 1120'</li>
-                    <li class=ours>Wunderlist:15:in `0x0003c151 Wunderlist + 110929'</li>
-                    <li class=ours>Wunderlist:16:in `0x00023100 Wunderlist + 8448'</li>
-                </ul>
-            </div>
-            
-            
-            <div class=backtrace>
-                <strong>7x</strong>
-                <ul>
-                    <li>CoreFoundation:0:in `0x320d22bb &lt;redacted> + 186'</li>
-                    <li>libobjc.A.dylib:1:in `0x32f9097f objc_exception_throw + 30'</li>
-                    <li>CoreFoundation:2:in `0x320d1f99 &lt;redacted> + 0'</li>
-                    <li class=ours>Wunderlist:3:in `0x000ffb51 Wunderlist + 912209'</li>
-                    <li class=ours>Wunderlist:6:in `0x000fde11 Wunderlist + 904721'</li>
-                    <li>libdispatch.dylib:7:in `0x346c211f &lt;redacted> + 10'</li>
-                    <li>libdispatch.dylib:8:in `0x346c14b7 &lt;redacted> + 22'</li>
-                    <li>libdispatch.dylib:9:in `0x346c2dcb &lt;redacted> + 226'</li>
-                    <li>GraphicsServices:13:in `0x39e162eb GSEventRunModal + 74'</li>
-                    <li>UIKit:14:in `0x398d42f9 UIApplicationMain + 1120'</li>
-                    <li class=ours>Wunderlist:15:in `0x0003c151 Wunderlist + 110929'</li>
-                    <li class=ours>Wunderlist:16:in `0x00023100 Wunderlist + 8448'</li>
-                </ul>
-            </div>
-            
-            <div class=backtrace>
-                <strong>14x</strong>
-                <ul>
-                    <li>CoreFoundation:0:in `0x320d22bb &lt;redacted> + 186'</li>
-                    <li>libobjc.A.dylib:1:in `0x32f9097f objc_exception_throw + 30'</li>
-                    <li>CoreFoundation:2:in `0x320d1f99 &lt;redacted> + 0'</li>
-                    <li class=ours>Wunderlist:3:in `0x000ffb51 Wunderlist + 912209'</li>
-                    <li class=ours>Wunderlist:6:in `0x000fde11 Wunderlist + 904721'</li>
-                    <li>libdispatch.dylib:7:in `0x346c211f &lt;redacted> + 10'</li>
-                    <li>libdispatch.dylib:8:in `0x346c14b7 &lt;redacted> + 22'</li>
-                    <li>libdispatch.dylib:9:in `0x346c2dcb &lt;redacted> + 226'</li>
-                    <li>GraphicsServices:13:in `0x39e162eb GSEventRunModal + 74'</li>
-                    <li>UIKit:14:in `0x398d42f9 UIApplicationMain + 1120'</li>
-                    <li class=ours>Wunderlist:15:in `0x0003c151 Wunderlist + 110929'</li>
-                    <li class=ours>Wunderlist:16:in `0x00023100 Wunderlist + 8448'</li>
-                </ul>
-            </div>
-            
-            
-        </div>
+        <p>Click any crash on the left to see details.</p>
     </div>
 
     <table id="crash-list">
         <tr>
             <th>No</th>
-            <th>#</th>
+            <th>Count</th>
             <th>Title</th>
         </tr>
-
-        <tr>
-            <td class=no>1</td>
-            <td class=count>478</td>
-            <td class=title>ALog: (indexPathsByObjectID[objectID] == nil), Inconsistency: Found objectID twice:</td>
-        </tr>
-        <tr class=last>
-            <td class=message colspan=3>Inconsistency: Found objectID twice:</td>
-        </tr>
-        
-        <tr class=selected>
-            <td class=no>2</td>
-            <td class=count>305</td>
-            <td class=title>NSInvalidArgumentException</td>
-        </tr>
-        <tr class="last selected">
-            <td class=message colspan=3>Unacceptable type of value for attribute: property = "userName"; desired type = NSString; given type = NSNull; value = &lt;null>.'</td>
-        </tr>
-        
-        <tr>
-            <td class=no>3</td>
-            <td class=count>117</td>
-            <td class=title>NSInternalInconsistencyException</td>
-        </tr>
-        <tr class=last>
-            <td class=message colspan=3>attempt to delete row 0 from section 1 which only contains 0 rows before the update</td>
-        </tr>
-
     </table>
 
 </body>

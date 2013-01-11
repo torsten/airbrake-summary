@@ -125,11 +125,21 @@ if __name__ == "__main__":
         for class_key, klass_errors in classes.iteritems():
             title, backtrace = class_key
 
+            message = klass_errors[0]["error-message"]
+            if title.startswith("ALog"):
+                match = re.match(r"ALog: \(.+?\), (.+)", message)
+                if match:
+                    message = match.group(1)
+                else:
+                    message = ""
+            elif message.startswith(title + ": "):
+                message = message[len(title + ": "):]
+
             output.append({"title":title,
                            "count":len(klass_errors),
-                           "sample_message": "" if title.startswith("ALog") else klass_errors[0]["error-message"],
+                           "message": message,
                            "short_trace": backtrace,
-                           "errors": klass_errors})
+                           "errors": klass_errors}) # TODO: Normalize error messages
 
             # print(len(klass_errors), title.encode('utf8'))
             print("%d %s %r // %r // %r" % (len(klass_errors), title, klass_errors[0]["error-message"] if not title.startswith("ALog") else "", " - ".join("%s:%s" % tup for tup in backtrace), repr(klass_errors[0]["environment"])))
@@ -139,6 +149,7 @@ if __name__ == "__main__":
             #     # print(len(klass_errors), title.encode('utf8') + klass_errors[0]["error-message"] + " // " + " - ".join("%s:%s" % tup for tup in backtrace))
             # else:
             #     print(len(klass_errors), title.encode('utf8') + " // " + " - ".join("%s:%s" % tup for tup in backtrace))
-        
+
         output_file = open("clusters.json", "w")
         json.dump(output, output_file)
+        output_file.close()

@@ -98,7 +98,7 @@
                 };
 
                 if (! backtraceCounter.hasOwnProperty(packedTrace)) {
-                    backtraceCounter[packedTrace] = {"count": multiplier, "trace": backtrace};
+                    backtraceCounter[packedTrace] = {"count": multiplier, "trace": errors[i]["symbolicated"]};
                 }
                 else {
                     backtraceCounter[packedTrace]["count"] += multiplier;

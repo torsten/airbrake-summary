@@ -3,6 +3,7 @@ from __future__ import print_function
 
 import sys
 import json
+import multiprocessing
 
 import requests
 from pyquery import PyQuery as pq
@@ -15,7 +16,12 @@ def fetch_error_pages(account, project_id, auth_token):
         print("Fetching page %d" % page)
         url = "%s/projects/%d/groups.xml" % (base_url, project_id)
         params = {'page': page, 'auth_token': auth_token}
-        resp = requests.get(url, params=params)
+        
+        try:
+            resp = requests.get(url, params=params)
+        except requests.exceptions.ConnectionError:
+            print("requests.exceptions.ConnectionError")
+            continue
 
         if resp.ok:
             # print("got: %r" % (resp.text,))
@@ -32,11 +38,22 @@ def fetch_error_pages(account, project_id, auth_token):
             break
 
 
-def fetch_error(account, error_id, auth_token):
+def fetch_error(args):
+    account, error_id, auth_token = args
+
     url = "http://%s.airbrake.io/errors/%s.xml" % (account, error_id)
     params = {'auth_token': auth_token}
 
-    resp = requests.get(url, params=params)
+    try:
+        resp = requests.get(url, params=params)
+
+        print(".", end="")
+        sys.stdout.flush()
+        
+    except requests.exceptions.ConnectionError:
+        print("requests.exceptions.ConnectionError")
+        return None
+    
     if resp.ok:
         return resp.text
     else:
@@ -55,16 +72,17 @@ if __name__ == "__main__":
             config = json.load(f)
             auth_token = config['auth_token']
             account = config['account']
-            project = config['project_id']
+            project = int(config['project_id'])
+
+            pool = multiprocessing.Pool(processes=10)
 
             for page in fetch_error_pages(account, project, auth_token):
-                for group in page:
-                    error_id = pq(group)("id").text()
 
-                    print(".", end="")
-                    sys.stdout.flush()
-
-                    error_data = fetch_error(account, error_id, auth_token)
+                arguments = [(account, pq(group)("id").text(), auth_token) for group in page]
+                results = pool.map(fetch_error, arguments)
+                
+                for error_data, args in zip(results, arguments):
+                    _, error_id, _ = args
                     all_errors[error_id] = error_data
 
                 print()
@@ -73,4 +91,3 @@ if __name__ == "__main__":
         print("Caught CTRL-C")
 
     save_errors()
-

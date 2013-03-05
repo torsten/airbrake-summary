@@ -39,7 +39,7 @@ def fetch_error_pages(account, project_id, auth_token):
 
 
 def fetch_error(args):
-    account, error_id, auth_token = args
+    account, error_id, auth_token, i = args
 
     url = "http://%s.airbrake.io/errors/%s.xml" % (account, error_id)
     params = {'auth_token': auth_token}
@@ -47,11 +47,11 @@ def fetch_error(args):
     try:
         resp = requests.get(url, params=params)
 
-        print(".", end="")
+        print("%d " % i, end="")
         sys.stdout.flush()
         
     except requests.exceptions.ConnectionError:
-        print("requests.exceptions.ConnectionError")
+        print("ConnectionError ", end="")
         return None
     
     if resp.ok:
@@ -74,15 +74,15 @@ if __name__ == "__main__":
             account = config['account']
             project = int(config['project_id'])
 
-            pool = multiprocessing.Pool(processes=10)
+            pool = multiprocessing.Pool(processes=30)
 
             for page in fetch_error_pages(account, project, auth_token):
 
-                arguments = [(account, pq(group)("id").text(), auth_token) for group in page]
+                arguments = [(account, pq(group)("id").text(), auth_token, i) for i, group in enumerate(page)]
                 results = pool.map(fetch_error, arguments)
                 
                 for error_data, args in zip(results, arguments):
-                    _, error_id, _ = args
+                    error_id = args[1]
                     all_errors[error_id] = error_data
 
                 print()

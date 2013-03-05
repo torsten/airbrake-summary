@@ -1,4 +1,7 @@
 *~
 config.json
 errors.json
+clusters.json*
 venv
+.DS_Store
+

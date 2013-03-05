@@ -51,6 +51,7 @@
             var platformCounter = {};
             var osCounter = {};
             var backtraceCounter = {};
+            var versionCounter = {};
 
             var errors = crashDict["errors"];
             for (var i=0; i < errors.length; i++) {
@@ -62,6 +63,11 @@
                 var message = errors[i]["error-message"];
                 var platform = errors[i]["environment"]["platform"];
                 var os = errors[i]["environment"]["operating-system"];
+                var appVersion = errors[i]["environment"]["application-version"];
+
+                message = message.replace(/0x[a-f0-9]{8}/, "0x{HEX}");
+                os = os.replace(/\s*Version\s+(.+)\s+\(.+\)\s*$/, "$1");
+                appVersion = appVersion.replace(/ \(.+\)\s*$/, "");
 
                 if (! messageCounter.hasOwnProperty(message)) {
                     messageCounter[message] = multiplier;
@@ -82,6 +88,13 @@
                 }
                 else {
                     osCounter[os] += multiplier;
+                }
+                
+                if (! versionCounter.hasOwnProperty(appVersion)) {
+                    versionCounter[appVersion] = multiplier;
+                }
+                else {
+                    versionCounter[appVersion] += multiplier;
                 }
 
                 var traceRegex = /^\s*([^:]+):.+\+ (\d+)'?\s*$/g;
@@ -107,16 +120,24 @@
 
             var countedMessages = orderByFrequency(messageCounter);
             for (var i=0; i < countedMessages.length; i++) {
-                details.append('<p><span class=count>' + countedMessages[i]["count"] + 'x</span> ' +
+                details.append('<p><span class=count>' + countedMessages[i]["count"] + '×</span> ' +
                                     countedMessages[i]["key"] + '</p>');
             };
             
             details.append('<h3>Environment</h3>');
             
+            details.append('<p><strong>Version:</strong> ');
+            var countedVersions = orderByFrequency(versionCounter);
+            for (var i=0; i < countedVersions.length; i++) {
+                details.append('<span class=count>' + countedVersions[i]["count"] + '×</span> ' +
+                               countedVersions[i]["key"] + ', ');
+            };
+            details.append('</p>');
+            
             details.append('<p><strong>Platform:</strong> ');
             var countedPlatforms = orderByFrequency(platformCounter);
             for (var i=0; i < countedPlatforms.length; i++) {
-                details.append('<span class=count>' + countedPlatforms[i]["count"] + 'x</span> ' +
+                details.append('<span class=count>' + countedPlatforms[i]["count"] + '×</span> ' +
                                countedPlatforms[i]["key"] + ', ');
             };
             details.append('</p>');
@@ -124,7 +145,7 @@
             details.append('<p><strong>Operating System:</strong> ');
             var countedOSs = orderByFrequency(osCounter);
             for (var i=0; i < countedOSs.length; i++) {
-                details.append('<span class=count>' + countedOSs[i]["count"] + 'x</span> ' +
+                details.append('<span class=count>' + countedOSs[i]["count"] + '×</span> ' +
                                countedOSs[i]["key"] + ', ');
             };
             details.append('</p>');
@@ -162,7 +183,7 @@
                 };
                 
                 backtracesElement.append('<div class=backtrace>' +
-                                             '<strong>' + traceObj["count"] + 'x</strong>' +
+                                             '<strong>' + traceObj["count"] + '×</strong>' +
                                              '<ul>' + listTrace + '</ul>'+
                                          '</div>');
             };

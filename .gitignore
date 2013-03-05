@@ -1,7 +1,7 @@
 *~
+.DS_Store
+clusters.json*
 config.json
 errors.json
-clusters.json*
+jquery-1.7.2.js
 venv
-.DS_Store
-

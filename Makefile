@@ -21,3 +21,6 @@ cluster:
 
 repl:
 	./venv/bin/python
+
+jquery-1.7.2.js:
+	curl -LO http://code.jquery.com/jquery-1.7.2.js

@@ -1,0 +1,23 @@
+{
+    "auth_token": "some long has",
+    "account": "airbrake subdomain",
+    "project_id": "numeric project id",
+
+    /* These are strings for a error's error-class which
+       will be split and clustered according to their stack traces. */
+    "split_patterns":  [
+        "NSInvalidArgumentException",
+        "Segmentation fault: 11",
+        "NSInternalInconsistencyException",
+        "NSRangeException",
+        "NSObjectInaccessibleException"
+    ],
+
+    /* Merge patterns are the opposite of split patterns, these are
+       errors that appear to be different but are really the same issue.
+       All errors which match one pattern will be grouped together. */
+    "merge_patterns": [
+        "ELog: CoreData save operation failed invalid title",
+        "ELog: Fetching failed Error Domain=NSCocoaErrorDomain Code=259"
+    ]
+}
